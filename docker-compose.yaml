@@ -1,0 +1,66 @@
+services:
+  backend:
+    container_name: backend
+    image: logcomex/backend
+    build:
+      context: ./backend/docker
+      dockerfile: ./Dockerfile
+    entrypoint: /backend/docker/entrypoint.sh
+    working_dir: /backend
+    env_file:
+      - ".env"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - "./backend:/backend"
+      - "caddy_data:/data"
+      - "caddy_config:/config"
+    depends_on:
+      database:
+        condition: "service_healthy"
+      redis:
+        condition: "service_healthy"
+  database:
+    container_name: database
+    image: postgres:18.4-alpine3.24
+    environment:
+      POSTGRES_DB: "${DB_DATABASE}"
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+    volumes:
+      - "database:/var/lib/postgresql"
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
+      interval: "120s"
+      timeout: "1s"
+      start_period: "10s"
+      retries: 3
+  redis:
+    container_name: redis
+    image: "redis:8.4.0-alpine"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: "10s"
+      timeout: "1s"
+      start_period: "5s"
+      retries: 3
+  frontend:
+    container_name: frontend
+    image: logcomex/frontend
+    build:
+      context: ./frontend/docker
+      dockerfile: ./Dockerfile
+    entrypoint: /frontend/docker/entrypoint.sh
+    volumes:
+      - "./frontend:/frontend"
+    ports:
+        - "5173:5173"
+
+volumes:
+  database:
+  caddy_data:
+  caddy_config:
